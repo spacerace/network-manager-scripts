@@ -154,7 +154,7 @@ def crack_wps(bssid, channel, interface):
 	return 0;
        
 if __name__ == "__main__":
-    print "net v036 (c) 2012 Nils Stec"
+    print "net v037 (c) 2012,2013 Nils Stec"
     arguments = len(sys.argv)-1
     arg = 1
     csv_id = 0
@@ -166,7 +166,7 @@ if __name__ == "__main__":
     write_csv_file = "./log-" + (str)(time.time()) + ".csv"
     while arg <= arguments:
 	if sys.argv[arg] == "--help":
-	    print " net v034 is a tool, which scans for EasyBox-APs, calculates the default WPA/WPA2-PSK"
+	    print " net v037 is a tool, which scans for EasyBox-APs, calculates the default WPA/WPA2-PSK"
 	    print " and can test them by itself. All interfaces you want to use have to be accessible by"
 	    print " network-manager, because we scan and try to connect with nm."
 	    print " some users may think this is overload or anything else - fuck you, this was the simplest way!\n"
@@ -257,10 +257,10 @@ if __name__ == "__main__":
 	easy_boxes = count_easy_boxes();
 	print " > starting easy-box-attack on %d networks..." % easy_boxes
 	easy_boxes_cracked = crack_easy_boxes()
-    if do_nm == 1:
-	easy_boxes = count_easy_boxes();
-	print " > starting easy-box-attack on %d networks and adding all found boxes to NM's system connections..." % easy_boxes
-	nm()
+    #if do_nm == 1:
+    #	easy_boxes = count_easy_boxes();
+    #	print " > starting easy-box-attack on %d networks and adding all found boxes to NM's system connections..." % easy_boxes
+    #	nm()
     if easy_box_guess == 1:
 	print " > starting easy-box-attack on other networks with arcadyan BSSIDs (guessing easy boxes)..."
 	guess_easy_boxes()
